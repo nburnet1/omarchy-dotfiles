@@ -75,6 +75,48 @@ BarWidget {
     return null
   }
 
+  function toplevelAppId(toplevel) {
+    if (!toplevel) return ""
+    var wayland = toplevel.wayland
+    if (wayland && wayland.appId) return String(wayland.appId)
+    if (toplevel.appId) return String(toplevel.appId)
+    var ipc = toplevel.lastIpcObject
+    if (ipc) {
+      if (ipc.initialClass) return String(ipc.initialClass)
+      if (ipc.class) return String(ipc.class)
+    }
+    return ""
+  }
+
+  function iconForAppId(appId) {
+    var id = String(appId || "")
+    if (!id) return ""
+    try {
+      if (typeof DesktopEntries !== "undefined" && DesktopEntries.heuristicLookup) {
+        var entry = DesktopEntries.heuristicLookup(id)
+        if (entry && entry.icon) return Quickshell.iconPath(entry.icon, true)
+      }
+    } catch (e) {}
+    return Quickshell.iconPath(id, true)
+  }
+
+  function appIconsForWorkspace(workspace) {
+    if (!workspace || !workspace.toplevels) return []
+    var values = workspace.toplevels.values || []
+    var seen = {}
+    var icons = []
+    for (var i = 0; i < values.length; i++) {
+      var id = root.toplevelAppId(values[i])
+      if (!id) continue
+      var key = id.toLowerCase()
+      if (seen[key]) continue
+      seen[key] = true
+      icons.push(root.iconForAppId(id))
+      if (icons.length >= 4) break
+    }
+    return icons
+  }
+
   // The first five of the monitor's own, and any of the rest that exist. After
   // them come workspaces that are only visiting: those of a monitor that is
   // unplugged, which had no room to join this one's.
@@ -266,6 +308,7 @@ BarWidget {
         readonly property int slot: root.slotOf(modelData)
         readonly property bool firstGuest: root.blockOf(modelData) !== root.block && index > 0 && root.blockOf(root.workspaceIds()[index - 1]) === root.block
         readonly property int windowCount: workspace && workspace.toplevels ? workspace.toplevels.values.length : 0
+        readonly property var appIcons: root.appIconsForWorkspace(workspace)
 
         // A gap sets visiting workspaces apart from the monitor's own.
         Layout.leftMargin: firstGuest && !root.vertical ? Style.space(6) : 0
@@ -298,21 +341,24 @@ BarWidget {
         Row {
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.bottom: parent.bottom
-          anchors.bottomMargin: 3
-          spacing: 2
-          visible: windowCount > 0 && !root.vertical
+          anchors.bottomMargin: 2
+          spacing: 1
+          visible: appIcons.length > 0 && !root.vertical
 
           Repeater {
-            model: Math.min(windowCount, 4)
+            model: appIcons
 
-            Rectangle {
-              width: 3
-              height: 3
-              radius: 1.5
-              color: slotItem.shown
-                ? (root.bar ? root.bar.urgent : Commons.Color.urgent)
-                : (root.bar ? root.bar.barForeground : Commons.Color.foreground)
-              opacity: slotItem.shown ? 0.95 : 0.55
+            Image {
+              required property var modelData
+              width: 10
+              height: 10
+              source: modelData
+              sourceSize: Qt.size(20, 20)
+              fillMode: Image.PreserveAspectFit
+              asynchronous: true
+              smooth: true
+              mipmap: true
+              opacity: slotItem.shown ? 1.0 : 0.8
             }
           }
         }
