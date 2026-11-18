@@ -1,6 +1,6 @@
 {
   "bar": {
-    "background": "opaque",
+    "background": "glassy",
     "layout": {
       "center": [
         {
@@ -17,7 +17,6 @@
       ],
       "centerEnd": [
         {
-          "id": "omarchy.elsewhen",
           "cities": [
             {
               "name": "New York",
@@ -39,7 +38,8 @@
               "name": "Los Angeles",
               "zone": "America/Los_Angeles"
             }
-          ]
+          ],
+          "id": "omarchy.elsewhen"
         },
         {
           "id": "omarchy.weather"
@@ -53,7 +53,7 @@
           "id": "omarchy.menu"
         },
         {
-          "id": "omarchy.workspaces"
+          "id": "nburnet1.workspaces"
         }
       ],
       "right": [
@@ -81,7 +81,8 @@
         {
           "id": "omarchy.power"
         }
-      ]
+      ],
+      "tray": []
     },
     "position": "top"
   },
