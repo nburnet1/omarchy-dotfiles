@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 BarWidget {
@@ -84,6 +85,7 @@ BarWidget {
     if (ipc) {
       if (ipc.initialClass) return String(ipc.initialClass)
       if (ipc.class) return String(ipc.class)
+      if (ipc.initialTitle) return String(ipc.initialTitle)
     }
     return ""
   }
@@ -91,30 +93,53 @@ BarWidget {
   function iconForAppId(appId) {
     var id = String(appId || "")
     if (!id) return ""
+    var candidates = [id, id.toLowerCase()]
     try {
       if (typeof DesktopEntries !== "undefined" && DesktopEntries.heuristicLookup) {
         var entry = DesktopEntries.heuristicLookup(id)
-        if (entry && entry.icon) return Quickshell.iconPath(entry.icon, true)
+        if (entry && entry.icon) candidates.unshift(String(entry.icon))
       }
     } catch (e) {}
-    return Quickshell.iconPath(id, true)
+    for (var i = 0; i < candidates.length; i++) {
+      var icon = Quickshell.iconPath(candidates[i], true)
+      if (icon) return icon
+    }
+    return ""
   }
 
-  function appIconsForWorkspace(workspace) {
-    if (!workspace || !workspace.toplevels) return []
-    var values = workspace.toplevels.values || []
+  function workspaceToplevels(workspaceId) {
+    var out = []
+    var lists = []
+
+    var ws = root.workspaceById(workspaceId)
+    if (ws && ws.toplevels && ws.toplevels.values) lists.push(ws.toplevels.values)
+
+    var all = Hyprland.toplevels ? Hyprland.toplevels.values : null
+    if (all && all.length) {
+      for (var i = 0; i < all.length; i++) {
+        var tl = all[i]
+        var tws = tl.workspace || (tl.wayland && tl.wayland.workspace)
+        if (tws && tws.id === workspaceId) out.push(tl)
+      }
+      if (out.length > 0) return out
+    }
+
+    return lists.length > 0 ? lists[0] : []
+  }
+
+  function appIconsForWorkspaceId(workspaceId) {
+    var values = root.workspaceToplevels(workspaceId)
     var seen = {}
-    var icons = []
     for (var i = 0; i < values.length; i++) {
       var id = root.toplevelAppId(values[i])
       if (!id) continue
       var key = id.toLowerCase()
       if (seen[key]) continue
       seen[key] = true
-      icons.push(root.iconForAppId(id))
-      if (icons.length >= 4) break
+      var icon = root.iconForAppId(id)
+      if (icon) return [icon]
     }
-    return icons
+    return []
   }
 
   // The first five of the monitor's own, and any of the rest that exist. After
@@ -303,64 +328,121 @@ BarWidget {
         required property int index
 
         readonly property var workspace: root.workspaceById(modelData)
-        readonly property bool occupied: workspace !== null && workspace.toplevels.values.length > 0
+        readonly property bool occupied: workspace !== null && workspace.toplevels && workspace.toplevels.values.length > 0
         readonly property bool shown: root.monitor !== null && root.monitor.activeWorkspace !== null && root.monitor.activeWorkspace.id === modelData
         readonly property int slot: root.slotOf(modelData)
         readonly property bool firstGuest: root.blockOf(modelData) !== root.block && index > 0 && root.blockOf(root.workspaceIds()[index - 1]) === root.block
-        readonly property int windowCount: workspace && workspace.toplevels ? workspace.toplevels.values.length : 0
-        readonly property var appIcons: root.appIconsForWorkspace(workspace)
+        readonly property var appIcons: root.appIconsForWorkspaceId(modelData)
+        readonly property string slotLabel: slot === root.slots ? "0" : String(slot)
+        readonly property color slotColor: shown
+          ? Commons.Color.accent
+          : (root.bar ? root.bar.barForeground : "#cccccc")
 
         // A gap sets visiting workspaces apart from the monitor's own.
         Layout.leftMargin: firstGuest && !root.vertical ? Style.space(6) : 0
         Layout.topMargin: firstGuest && root.vertical ? Style.space(6) : 0
 
-        implicitWidth: button.implicitWidth
-        implicitHeight: button.implicitHeight
+        readonly property real hPad: Style.spaceReal(7)
+        readonly property real bgWidth: content.implicitWidth + hPad * 2
+        readonly property real bgHeight: Math.max(18, root.barSize - Style.spaceReal(6))
 
-        WidgetButton {
-          id: button
-          anchors.fill: parent
-          bar: root.bar
-          text: slot === root.slots ? "0" : String(slot)
-          active: shown
-          opacity: occupied || shown ? 1 : 0.5
-          horizontalMargin: 6
-          verticalPadding: 6
-          fixedWidth: root.vertical ? root.barSize : Style.space(20)
-          fixedHeight: root.barSize
-          tooltipText: shown ? ("Layout: " + root.activeMode + " (click to cycle)") : ""
-          onPressed: function() {
-            if (shown) slotItem.cycleLayout()
-            else root.focusWorkspace(slotItem.modelData)
-          }
-          onWheelMoved: function(delta) { root.scrollWorkspaces(delta) }
+        implicitWidth: bgWidth
+        implicitHeight: root.barSize
+        opacity: occupied || shown ? 1 : 0.45
+        scale: mouseArea.pressed ? 0.96 : 1
+
+        Behavior on opacity {
+          NumberAnimation { duration: Style.duration(140); easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+          NumberAnimation { duration: Style.duration(120); easing.type: Easing.OutCubic }
         }
 
-        function cycleLayout() { root.cycleLayout() }
+        Rectangle {
+          id: bg
+          anchors.centerIn: parent
+          width: slotItem.bgWidth
+          height: slotItem.bgHeight
+          radius: 3
+          color: slotItem.shown
+            ? Qt.rgba(slotItem.slotColor.r, slotItem.slotColor.g, slotItem.slotColor.b, 0.14)
+            : "transparent"
+          border.width: 1
+          border.color: slotItem.shown
+            ? Qt.rgba(slotItem.slotColor.r, slotItem.slotColor.g, slotItem.slotColor.b, 0.75)
+            : Qt.rgba(slotItem.slotColor.r, slotItem.slotColor.g, slotItem.slotColor.b, slotItem.occupied ? 0.35 : 0.2)
 
-        Row {
-          anchors.horizontalCenter: parent.horizontalCenter
-          anchors.bottom: parent.bottom
-          anchors.bottomMargin: 2
-          spacing: 1
-          visible: appIcons.length > 0 && !root.vertical
-
-          Repeater {
-            model: appIcons
-
-            Image {
-              required property var modelData
-              width: 10
-              height: 10
-              source: modelData
-              sourceSize: Qt.size(20, 20)
-              fillMode: Image.PreserveAspectFit
-              asynchronous: true
-              smooth: true
-              mipmap: true
-              opacity: slotItem.shown ? 1.0 : 0.8
-            }
+          Behavior on border.color {
+            ColorAnimation { duration: Style.duration(140) }
           }
+          Behavior on color {
+            ColorAnimation { duration: Style.duration(140) }
+          }
+        }
+
+        RowLayout {
+          id: content
+          anchors.centerIn: parent
+          spacing: (appIcon.visible || fallbackDot.visible) ? 3 : 0
+
+          Text {
+            id: label
+            Layout.alignment: Qt.AlignVCenter
+            textFormat: Text.PlainText
+            text: slotItem.slotLabel
+            color: slotItem.slotColor
+            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.pixelSize: Style.font.body
+            renderType: Text.NativeRendering
+          }
+
+          Image {
+            id: appIcon
+            Layout.alignment: Qt.AlignVCenter
+            visible: slotItem.appIcons.length > 0 && !root.vertical
+            Layout.preferredWidth: 11
+            Layout.preferredHeight: 11
+            source: visible ? slotItem.appIcons[0] : ""
+            sourceSize: Qt.size(22, 22)
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            smooth: true
+            mipmap: true
+            opacity: slotItem.shown ? 1.0 : 0.85
+          }
+
+          Text {
+            id: fallbackDot
+            Layout.alignment: Qt.AlignVCenter
+            visible: !appIcon.visible && slotItem.occupied && !root.vertical
+            textFormat: Text.PlainText
+            text: "•"
+            color: slotItem.slotColor
+            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.pixelSize: 10
+            opacity: 0.8
+          }
+        }
+
+        MouseArea {
+          id: mouseArea
+          anchors.fill: parent
+          hoverEnabled: true
+          acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+          cursorShape: Qt.PointingHandCursor
+          onEntered: {
+            if (root.bar && slotItem.shown)
+              root.bar.showTooltip(slotItem, "Layout: " + root.activeMode + " (click to cycle)")
+          }
+          onExited: {
+            if (root.bar) root.bar.hideTooltip(slotItem)
+          }
+          onClicked: function(mouse) {
+            if (root.bar) root.bar.hideTooltip(slotItem)
+            if (slotItem.shown) root.cycleLayout()
+            else root.focusWorkspace(slotItem.modelData)
+          }
+          onWheel: function(wheel) { root.scrollWorkspaces(wheel.angleDelta.y) }
         }
       }
     }

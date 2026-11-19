@@ -5,6 +5,11 @@
 hl.config({
   input = {
     kb_options = "caps:super",
+    -- Invert scrolling (natural scroll)
+    natural_scroll = true,
+    touchpad = {
+      natural_scroll = true,
+    },
   },
 })
 

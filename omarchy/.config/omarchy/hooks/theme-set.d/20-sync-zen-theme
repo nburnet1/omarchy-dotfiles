@@ -1,0 +1,83 @@
+#!/bin/bash
+set -euo pipefail
+
+THEME_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+COLORS_TOML="$THEME_DIR/colors.toml"
+
+get_color() {
+  local key="$1" fallback="$2" value=""
+  if [[ -f "$COLORS_TOML" ]]; then
+    value="$(awk -v k="$key" '
+      /^[[:space:]]*#/ {next}
+      {
+        line=$0
+        lhs=$1
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", lhs)
+        if (lhs == k) {
+          v=line
+          sub(/^[^=]*=/, "", v)
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+          gsub(/^"/, "", v); gsub(/"$/, "", v)
+          gsub(/^\047/, "", v); gsub(/\047$/, "", v)
+          print v
+          exit
+        }
+      }' "$COLORS_TOML")"
+  fi
+  printf '%s\n' "${value:-$fallback}"
+}
+
+BG="$(get_color background '#1e1e1e')"
+FG="$(get_color foreground '#c0caf5')"
+ACCENT="$(get_color accent "$(get_color blue "$FG")")"
+MUTED="$(get_color muted "$(get_color color8 '#666666')")"
+SELECTION="$(get_color selection_background "$(get_color selection "$ACCENT")")"
+SURFACE="$(get_color lighter_background "$(get_color color0 "$BG")")"
+EDITOR="$(get_color darker_background "$BG")"
+BORDER="$(get_color color8 "$MUTED")"
+INPUT_BORDER="$(get_color color8 "$BORDER")"
+HOVER="$(get_color lighter_background "$SURFACE")"
+ACTIVE="$(get_color bright_foreground "$FG")"
+RADIUS="4px"
+
+write_theme_css() {
+  local chrome_dir="$1"
+  mkdir -p "$chrome_dir"
+  cat > "$chrome_dir/dotfiles-theme.css" <<CSS
+:root {
+  --dot-theme-bg: ${BG};
+  --dot-theme-editor: ${EDITOR};
+  --dot-theme-surface: ${SURFACE};
+  --dot-theme-border: ${BORDER};
+  --dot-theme-input-border: ${INPUT_BORDER};
+  --dot-theme-hover: ${HOVER};
+  --dot-theme-text: ${FG};
+  --dot-theme-muted: ${MUTED};
+  --dot-theme-active: ${ACTIVE};
+  --dot-theme-accent: ${ACCENT};
+  --dot-theme-selection: ${SELECTION};
+  --dot-theme-radius: ${RADIUS};
+}
+CSS
+}
+
+USERCHROME_SRC="$HOME/Programs/dotfiles/.config/zen/userChrome.css"
+
+shopt -s nullglob
+for profile_dir in "$HOME/.config/zen"/*/ "$HOME/.zen"/*/; do
+  [[ -d "$profile_dir" ]] || continue
+  [[ -f "$profile_dir/prefs.js" || -f "$profile_dir/places.sqlite" || -f "$profile_dir/zen-themes.json" ]] || continue
+  chrome_dir="$profile_dir/chrome"
+  write_theme_css "$chrome_dir"
+  if [[ ! -f "$chrome_dir/userChrome.css" ]]; then
+    if [[ -f "$USERCHROME_SRC" ]]; then
+      cp "$USERCHROME_SRC" "$chrome_dir/userChrome.css"
+    else
+      cat > "$chrome_dir/userChrome.css" <<'CSS'
+@import url("dotfiles-theme.css");
+CSS
+    fi
+  elif ! grep -q 'dotfiles-theme.css' "$chrome_dir/userChrome.css" 2>/dev/null; then
+    :
+  fi
+done

@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$HOME"
-PACKAGES=(hypr omarchy)
+PACKAGES=(hypr omarchy bash nvim)
 
 if ! command -v stow >/dev/null 2>&1; then
   echo "Error: GNU stow is required but not installed." >&2
@@ -38,6 +38,8 @@ mkdir -p "$TARGET/.config"
 # Back up real/conflicting targets for managed config dirs
 backup_if_conflicting "$TARGET/.config/hypr"
 backup_if_conflicting "$TARGET/.config/omarchy"
+backup_if_conflicting "$TARGET/.bashrc"
+backup_if_conflicting "$TARGET/.config/nvim"
 
 cd "$REPO_DIR"
 stow -v -R -t "$TARGET" "${PACKAGES[@]}"
