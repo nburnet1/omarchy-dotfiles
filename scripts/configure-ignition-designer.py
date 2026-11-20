@@ -62,35 +62,42 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scale', type=int, choices=range(1, 9), metavar='N',
                         help='Set GDK_SCALE in existing user desktop entries (1 for the tested Kasm output)')
-    parser.add_argument('--application', help='Saved Designer entry name; required when there are multiple entries')
     parser.add_argument('--check', action='store_true', help='Verify saved settings without modifying anything')
     args = parser.parse_args()
     home = Path.home()
     config = home / '.ignition/clientlauncher-data/designer-launcher.json'
     if not config.is_file():
-        parser.error('Install Designer Launcher and save a Designer entry first')
+        parser.error('Install Designer Launcher and open it once first')
     data = json.loads(config.read_text())
     applications = data.get('applications', [])
-    selected = [entry for entry in applications if args.application is None or entry.get('name') == args.application]
-    if len(selected) != 1:
-        parser.error('Select exactly one saved Designer entry with --application NAME')
-    arguments = selected[0].get('jvm.arguments', [])
-    if not isinstance(arguments, list) or not all(isinstance(value, str) for value in arguments):
-        parser.error('Unsupported jvm.arguments format; launcher settings were not changed')
+    if not isinstance(applications, list) or not all(isinstance(entry, dict) for entry in applications):
+        parser.error('Unsupported applications format; launcher settings were not changed')
+    # Shared defaults cover future entries. Existing entries already have their
+    # own saved JVM arguments, so update those too without losing other options.
+    defaults = data.setdefault('global', {}).setdefault('client.defaults', {})
+    targets = [defaults, *applications]
     xml = home / '.ignition/synthetica-no-popup-capture.xml'
     settings = [
         '-Dignition.synthetica.customXml=' + str(xml),
         '-Dawt.useSystemAAFontSettings=on',
         '-Dswing.aatext=true',
     ]
-    updated = list(arguments)
-    for setting in settings:
-        prefix = setting.split('=', 1)[0] + '='
-        existing = [value for value in updated if value.startswith(prefix)]
-        if existing and existing != [setting]:
-            parser.error('An existing override conflicts with ' + prefix + '; merge it manually first')
-        if not existing:
-            updated.append(setting)
+    config_changed = False
+    for target in targets:
+        arguments = target.get('jvm.arguments', [])
+        if not isinstance(arguments, list) or not all(isinstance(value, str) for value in arguments):
+            parser.error('Unsupported jvm.arguments format; launcher settings were not changed')
+        updated = list(arguments)
+        for setting in settings:
+            prefix = setting.split('=', 1)[0] + '='
+            existing = [value for value in updated if value.startswith(prefix)]
+            if existing and existing != [setting]:
+                parser.error('An existing override conflicts with ' + prefix + '; merge it manually first')
+            if not existing:
+                updated.append(setting)
+        if arguments != updated:
+            config_changed = True
+            target['jvm.arguments'] = updated
     source = Path(__file__).resolve().parents[1] / 'applications/ignition/synthetica-no-popup-capture.xml'
     content = source.read_bytes()
     if xml.exists() and xml.read_bytes() != content:
@@ -117,16 +124,15 @@ def main():
                 result.append(line)
             desktop_updates.append((path, ('\n'.join(result) + '\n').encode()))
     if args.check:
-        correct = arguments == updated and xml.is_file() and xml.read_bytes() == content
+        correct = not config_changed and xml.is_file() and xml.read_bytes() == content
         correct = correct and all(path.read_bytes() == text for path, text in desktop_updates)
         print('Designer settings match.' if correct else 'Designer settings need configuration.')
         return 0 if correct else 1
     if designer_running():
         parser.error('Save and close Designer and Designer Launcher before applying settings')
-    selected[0]['jvm.arguments'] = updated
     changed = save(xml, content)
     # Avoid rewriting merely to change JSON formatting on repeat runs.
-    if arguments != updated:
+    if config_changed:
         changed = save(config, (json.dumps(data, indent=2) + '\n').encode(), private=True) or changed
     for path, text in desktop_updates:
         changed = save(path, text) or changed

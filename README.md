@@ -30,12 +30,14 @@ not included. The Zen theme hook currently uses the base stylesheet from
 ## Ignition Designer on Wayland / Kasm
 
 `install.sh` automatically applies the verified Designer settings with scale 1
-when a saved Designer entry exists. Already-matching settings are left alone,
-including when Designer is running. If settings need updating, save your work
+when Designer Launcher has been initialized. It updates the shared defaults and
+every saved Designer entry, covering existing and newly added Designers.
+Already-matching settings are left alone, including when Designer is running.
+If settings need updating, save your work
 and close both Designer and Designer Launcher before running the installer.
 
 If Designer is not installed/configured yet, install the vendor's Designer
-Launcher, launch it once and save a Designer entry, then close both applications
+Launcher, launch it once, then close both applications
 and rerun `install.sh`.
 
 To apply or check just the Designer settings separately:
@@ -45,8 +47,8 @@ python3 scripts/configure-ignition-designer.py --scale 1
 python3 scripts/configure-ignition-designer.py --scale 1 --check
 ```
 
-For multiple saved entries, also supply `--application 'ENTRY NAME'`. Omit
-`--scale 1` on a native desktop where you want its normal display scaling.
+Omit `--scale 1` when running the helper separately on a native desktop where
+you want its normal display scaling.
 
 This reapplies the settings verified with Ignition **8.3.10** in the
 [Kasm/Selkies container](https://github.com/nburnet1/kasm-omarchy-quattro):
@@ -55,8 +57,8 @@ This reapplies the settings verified with Ignition **8.3.10** in the
   `ignition.synthetica.customXml` setting (supported since 8.1.48) prevents menus
   from requesting screen-sharing permission for popup background captures.
 - `-Dawt.useSystemAAFontSettings=on` and `-Dswing.aatext=true` enable Java text
-  antialiasing for the selected Designer entry. They do not change the system
-  font or other applications.
+  antialiasing in the shared defaults and all saved Designer entries. They do not
+  change the system font or other applications.
 - The optional scale sets `GDK_SCALE` on the existing launcher and both URL/file
   handlers. This reaches both JavaFX Launcher and its Designer child, including
   when the running dock/terminal still has an older scale in its environment.
@@ -71,8 +73,9 @@ The command preserves unrelated settings, rejects conflicting custom XML/Java
 overrides, and creates timestamped backups only when files change. Launcher JSON
 and its backups can contain gateway details; they stay in your home directory,
 outside this repository. No launcher binaries, runtime, project, or gateway data
-are included. To undo, close both apps, remove the three added JVM arguments,
-remove `env GDK_SCALE=1` from the three desktop Exec lines, and remove the copied
+are included. To undo, close both apps, remove the three added JVM arguments
+from the shared defaults and each saved entry, remove `env GDK_SCALE=1` from the
+three desktop Exec lines, and remove the copied
 popup XML; use the backups if no later settings need preserving.
 
 Vendor reference: [Synthetica popup screen-capture setting](https://forum.inductiveautomation.com/t/ignition-8-1-45-designer-asking-for-monitor-sharing/102767/8).

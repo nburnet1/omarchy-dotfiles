@@ -51,7 +51,7 @@ if [[ -f "$HOME/.ignition/clientlauncher-data/designer-launcher.json" ]]; then
     python3 "$REPO_DIR/scripts/configure-ignition-designer.py" --scale 1
   fi
 else
-  echo "Designer Launcher is not configured yet; rerun install.sh after saving a Designer entry."
+  echo "Designer Launcher is not initialized yet; open it once, then rerun install.sh."
 fi
 
 if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
