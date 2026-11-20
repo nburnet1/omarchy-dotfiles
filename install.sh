@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export USER="$(whoami)"
 
 REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$HOME"
@@ -47,6 +48,12 @@ stow -v -R -t "$TARGET" "${PACKAGES[@]}"
 if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
   echo "Reloading Hyprland..."
   hyprctl reload >/dev/null 2>&1 || true
+  # A newly stowed plugin directory is not necessarily discovered by a running
+  # shell. Rescan before reloading the layout that references our widget.
+  if command -v omarchy-shell >/dev/null 2>&1; then
+    omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
+    omarchy-shell shell reloadConfig >/dev/null 2>&1 || true
+  fi
 fi
 
 echo "Done."
