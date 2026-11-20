@@ -27,11 +27,18 @@ Separately cloned themes, application data, credentials, and shell history are
 not included. The Zen theme hook currently uses the base stylesheet from
 `~/Programs/dotfiles/.config/zen/userChrome.css` when available.
 
-## Ignition Designer on Wayland / Kasm (optional)
+## Ignition Designer on Wayland / Kasm
 
-After installing the vendor's Designer Launcher, launch it once and save a
-Designer entry. Save your work and close both Designer and Designer Launcher,
-then run:
+`install.sh` automatically applies the verified Designer settings with scale 1
+when a saved Designer entry exists. Already-matching settings are left alone,
+including when Designer is running. If settings need updating, save your work
+and close both Designer and Designer Launcher before running the installer.
+
+If Designer is not installed/configured yet, install the vendor's Designer
+Launcher, launch it once and save a Designer entry, then close both applications
+and rerun `install.sh`.
+
+To apply or check just the Designer settings separately:
 
 ```sh
 python3 scripts/configure-ignition-designer.py --scale 1

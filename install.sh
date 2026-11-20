@@ -45,6 +45,15 @@ backup_if_conflicting "$TARGET/.config/nvim"
 cd "$REPO_DIR"
 stow -v -R -t "$TARGET" "${PACKAGES[@]}"
 
+if [[ -f "$HOME/.ignition/clientlauncher-data/designer-launcher.json" ]]; then
+  echo "Configuring Designer..."
+  if ! python3 "$REPO_DIR/scripts/configure-ignition-designer.py" --scale 1 --check >/dev/null; then
+    python3 "$REPO_DIR/scripts/configure-ignition-designer.py" --scale 1
+  fi
+else
+  echo "Designer Launcher is not configured yet; rerun install.sh after saving a Designer entry."
+fi
+
 if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
   echo "Reloading Hyprland..."
   hyprctl reload >/dev/null 2>&1 || true
