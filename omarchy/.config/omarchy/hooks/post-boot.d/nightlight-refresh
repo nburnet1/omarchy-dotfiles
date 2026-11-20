@@ -1,0 +1,12 @@
+#!/bin/bash
+# hyprsunset runs as a systemd user service (hyprsunset.service) with a constant
+# 2700K profile. Re-assert it once the session is up and sync the bar indicator,
+# which can probe before hyprsunset's IPC socket exists.
+for _ in {1..20}; do
+  if hyprctl hyprsunset temperature 2700 >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
+
+omarchy-shell -q nightlight refresh >/dev/null 2>&1
